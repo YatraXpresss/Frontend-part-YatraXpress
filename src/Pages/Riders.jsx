@@ -28,12 +28,24 @@ const Riders = () => {
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to fetch riders');
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
       }
 
-      const data = await response.json();
-      setRiders(data);
+      const text = await response.text(); // Get the response as text first
+      if (!text) {
+        setRiders([]); // If response is empty, set empty array
+        return;
+      }
+
+      try {
+        const data = JSON.parse(text); // Try to parse the JSON
+        setRiders(Array.isArray(data) ? data : data.riders || []); // Handle both array and object response
+      } catch (parseError) {
+        console.error('JSON Parse Error:', parseError);
+        console.log('Response Text:', text);
+        throw new Error('Invalid response format from server');
+      }
     } catch (err) {
       setError(err.message);
       console.error('Error fetching riders:', err);
@@ -97,60 +109,66 @@ const Riders = () => {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {filteredRiders.map((rider) => (
-            <Link 
-              key={rider.id} 
-              to={`/rider/${rider.id}`}
-              className="block bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow duration-200"
-            >
-              <div className="p-6">
-                <div className="flex items-center mb-4">
-                  <div className="h-12 w-12 rounded-full bg-gray-200 flex items-center justify-center">
-                    {rider.profile_image ? (
-                      <img 
-                        src={rider.profile_image} 
-                        alt={rider.name} 
-                        className="h-12 w-12 rounded-full object-cover"
-                      />
-                    ) : (
-                      <span className="text-2xl text-gray-600">
-                        {rider.name.charAt(0)}
+        {filteredRiders.length === 0 ? (
+          <div className="text-center py-12">
+            <p className="text-gray-500 text-lg">No riders found</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            {filteredRiders.map((rider) => (
+              <Link 
+                key={rider.id} 
+                to={`/rider/${rider.id}`}
+                className="block bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow duration-200"
+              >
+                <div className="p-6">
+                  <div className="flex items-center mb-4">
+                    <div className="h-12 w-12 rounded-full bg-gray-200 flex items-center justify-center">
+                      {rider.profile_image ? (
+                        <img 
+                          src={rider.profile_image} 
+                          alt={rider.name} 
+                          className="h-12 w-12 rounded-full object-cover"
+                        />
+                      ) : (
+                        <span className="text-2xl text-gray-600">
+                          {rider.name ? rider.name.charAt(0) : '?'}
+                        </span>
+                      )}
+                    </div>
+                    <div className="ml-4">
+                      <h2 className="text-xl font-semibold text-gray-900">{rider.name || 'Unknown'}</h2>
+                      <p className="text-sm text-gray-500">{rider.vehicle_type || 'No vehicle'}</p>
+                    </div>
+                    <div className="ml-auto flex items-center">
+                      <span className="text-yellow-400 mr-1">★</span>
+                      <span className="font-medium">{(rider.rating || 0).toFixed(1)}</span>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <div className="flex items-center text-sm text-gray-500">
+                      <svg className="h-5 w-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      {rider.experience_years || 0} years experience
+                    </div>
+                    <div className="flex items-center text-sm text-gray-500">
+                      <svg className="h-5 w-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                      </svg>
+                      {rider.total_rides || 0} total rides
+                    </div>
+                    <div className="flex items-center text-sm">
+                      <span className={rider.is_available ? 'text-green-500' : 'text-red-500'}>
+                        {rider.is_available ? '● Available now' : '● Unavailable'}
                       </span>
-                    )}
-                  </div>
-                  <div className="ml-4">
-                    <h2 className="text-xl font-semibold text-gray-900">{rider.name}</h2>
-                    <p className="text-sm text-gray-500">{rider.vehicle_type}</p>
-                  </div>
-                  <div className="ml-auto flex items-center">
-                    <span className="text-yellow-400 mr-1">★</span>
-                    <span className="font-medium">{rider.rating.toFixed(1)}</span>
+                    </div>
                   </div>
                 </div>
-                <div className="space-y-2">
-                  <div className="flex items-center text-sm text-gray-500">
-                    <svg className="h-5 w-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    {rider.experience_years} years experience
-                  </div>
-                  <div className="flex items-center text-sm text-gray-500">
-                    <svg className="h-5 w-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                    </svg>
-                    {rider.total_rides} total rides
-                  </div>
-                  <div className="flex items-center text-sm">
-                    <span className={rider.is_available ? 'text-green-500' : 'text-red-500'}>
-                      {rider.is_available ? '● Available now' : '● Unavailable'}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </Link>
-          ))}
-        </div>
+              </Link>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

@@ -19,11 +19,26 @@ class User extends Model {
         }
     }
 
+    private $userCache = [];
+
     public function findByEmail($email) {
         try {
+            // Check cache first
+            $cacheKey = 'email_' . $email;
+            if (isset($this->userCache[$cacheKey])) {
+                return $this->userCache[$cacheKey];
+            }
+
             $stmt = $this->db->prepare("SELECT * FROM {$this->table} WHERE email = ?");
             $stmt->execute([$email]);
-            return $stmt->fetch();
+            $result = $stmt->fetch();
+
+            // Cache the result
+            if ($result) {
+                $this->userCache[$cacheKey] = $result;
+            }
+
+            return $result;
         } catch (PDOException $e) {
             error_log("Database error in User::findByEmail: " . $e->getMessage());
             throw new Exception("Database error occurred");
@@ -75,54 +90,54 @@ class User extends Model {
 
     public function create($data) {
         try {
-            // Check if email already exists
+            $this->db->beginTransaction();
+
+            // Check if email already exists using index
             $existingUser = $this->findByEmail($data['email']);
             if ($existingUser) {
+                $this->db->rollBack();
                 error_log("Email already exists: " . $data['email']);
                 throw new Exception("Email already registered");
             }
 
-            // Hash password
-            $data['password'] = password_hash($data['password'], PASSWORD_DEFAULT);
+            // Hash password with cost factor optimization
+            $data['password'] = password_hash($data['password'], PASSWORD_DEFAULT, ['cost' => 10]);
 
-            // Prepare SQL with specific fields
+            // Prepare SQL with specific fields and use prepared statement
             $sql = "INSERT INTO users (name, email, password, phone, user_type, created_at) 
                     VALUES (?, ?, ?, ?, ?, NOW())";
             
-            error_log("Executing SQL: " . $sql);
-            error_log("With values: " . print_r([
-                $data['name'],
-                $data['email'],
-                '[HASHED_PASSWORD]',
-                $data['phone'] ?? null,
-                $data['user_type'] ?? 'customer'
-            ], true));
-
             $stmt = $this->db->prepare($sql);
-            $result = $stmt->execute([
-                $data['name'],
-                $data['email'],
-                $data['password'],
-                $data['phone'] ?? null,
-                $data['user_type'] ?? 'customer'
-            ]);
+            $stmt->bindParam(1, $data['name']);
+            $stmt->bindParam(2, $data['email']);
+            $stmt->bindParam(3, $data['password']);
+            $stmt->bindParam(4, $data['phone'] ?? null);
+            $stmt->bindParam(5, $data['user_type'] ?? 'customer');
+
+            $result = $stmt->execute();
 
             if (!$result) {
+                $this->db->rollBack();
                 error_log("Failed to execute SQL: " . print_r($stmt->errorInfo(), true));
                 throw new Exception("Failed to create user");
             }
 
             $userId = $this->db->lastInsertId();
-            error_log("User created with ID: " . $userId);
 
-            // Get the created user (without password)
+            // Get the created user (without password) using cache
             $user = $this->findById($userId);
             if (!$user) {
+                $this->db->rollBack();
                 error_log("Failed to retrieve created user");
                 throw new Exception("Failed to retrieve created user");
             }
 
+            $this->db->commit();
             unset($user['password']);
+
+            // Cache the new user
+            $this->userCache['email_' . $data['email']] = $user;
+            
             return $user;
 
         } catch (PDOException $e) {

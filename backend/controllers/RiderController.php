@@ -28,16 +28,30 @@ class RiderController extends Controller {
     public function index() {
         try {
             $riders = $this->riderModel->findAll();
+            
+            // Transform data to match frontend expectations
+            $transformedRiders = array_map(function($rider) {
+                return [
+                    'id' => (int)$rider['id'],
+                    'name' => $rider['name'],
+                    'vehicle_type' => $rider['vehicle_type'],
+                    'rating' => (float)$rider['rating'],
+                    'experience_years' => (int)$rider['experience_years'],
+                    'total_rides' => (int)$rider['total_rides'],
+                    'is_available' => (bool)$rider['is_available'],
+                    'profile_image' => $rider['profile_image']
+                ];
+            }, $riders);
+            
             header('Content-Type: application/json');
-            echo json_encode($riders);
+            echo json_encode($transformedRiders);
             exit;
         } catch (Exception $e) {
             error_log("Error in RiderController->index: " . $e->getMessage());
             header('HTTP/1.1 500 Internal Server Error');
             header('Content-Type: application/json');
             echo json_encode([
-                'error' => 'Failed to fetch riders. Please try again later.',
-                'debug_message' => $e->getMessage()
+                'message' => 'Failed to fetch riders. Please try again later.'
             ]);
             exit;
         }

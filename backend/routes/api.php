@@ -1,6 +1,20 @@
 <?php
 
 // User routes
+// Notification routes
+$router->post('/api/user/notification-token', function() {
+    require_once __DIR__ . '/../controllers/AuthController.php';
+    $controller = new AuthController();
+    $controller->updateNotificationToken();
+});
+
+$router->post('/api/user/notifications/toggle', function() {
+    require_once __DIR__ . '/../controllers/AuthController.php';
+    $controller = new AuthController();
+    $controller->toggleNotifications();
+});
+
+// User routes
 $router->post('/api/auth/register', function() {
     require_once __DIR__ . '/../controllers/AuthController.php';
     $controller = new AuthController();
@@ -15,19 +29,49 @@ $router->post('/api/auth/login', function() {
 
 // Rider routes
 $router->get('/api/riders', function() {
+    require_once __DIR__ . '/../middleware/AuthMiddleware.php';
     require_once __DIR__ . '/../controllers/RiderController.php';
+    
+    $auth = new AuthMiddleware();
+    if (!$auth->authenticate()) {
+        header('HTTP/1.1 401 Unauthorized');
+        header('Content-Type: application/json');
+        echo json_encode(['error' => 'Authentication required']);
+        exit;
+    }
+    
     $controller = new RiderController();
     $controller->index();
 });
 
 $router->get('/api/riders/:id', function() {
+    require_once __DIR__ . '/../middleware/AuthMiddleware.php';
     require_once __DIR__ . '/../controllers/RiderController.php';
+    
+    $auth = new AuthMiddleware();
+    if (!$auth->authenticate()) {
+        header('HTTP/1.1 401 Unauthorized');
+        header('Content-Type: application/json');
+        echo json_encode(['error' => 'Authentication required']);
+        exit;
+    }
+    
     $controller = new RiderController();
     $controller->show();
 });
 
 $router->get('/api/riders/:id/stats', function() {
+    require_once __DIR__ . '/../middleware/AuthMiddleware.php';
     require_once __DIR__ . '/../controllers/RiderController.php';
+    
+    $auth = new AuthMiddleware();
+    if (!$auth->authenticate()) {
+        header('HTTP/1.1 401 Unauthorized');
+        header('Content-Type: application/json');
+        echo json_encode(['error' => 'Authentication required']);
+        exit;
+    }
+    
     $controller = new RiderController();
     $controller->getRiderStats();
 });

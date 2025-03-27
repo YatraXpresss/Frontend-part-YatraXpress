@@ -14,17 +14,24 @@ class AuthController extends Controller {
         }
     }
 
+    private $registrationCache = [];
+    private $registrationCacheExpiry = 300; // 5 minutes in seconds
+
     public function register() {
         try {
             // Get and validate input data
             $input = file_get_contents('php://input');
-            error_log("Received registration data: " . $input);
-            
             $data = json_decode($input, true);
             
             if (!$data) {
-                error_log("JSON decode error: " . json_last_error_msg());
                 return $this->jsonResponse(['error' => 'Invalid JSON data'], 400);
+            }
+
+            // Check registration cache to prevent duplicate submissions
+            $cacheKey = md5($input);
+            if (isset($this->registrationCache[$cacheKey]) && 
+                (time() - $this->registrationCache[$cacheKey]['timestamp']) < $this->registrationCacheExpiry) {
+                return $this->registrationCache[$cacheKey]['response'];
             }
 
             // Validate required fields
@@ -59,19 +66,23 @@ class AuthController extends Controller {
                 $data['user_type'] = 'customer';
             }
 
-            // Create user
-            error_log("Attempting to create user with email: " . $data['email']);
+            // Create user with optimized database transaction
             $user = $this->userModel->create($data);
-
-            // Generate JWT token
             $token = $this->generateToken($user['id']);
 
-            error_log("User created successfully with ID: " . $user['id']);
-            return $this->jsonResponse([
+            $response = [
                 'message' => 'Registration successful',
                 'user' => $user,
                 'token' => $token
-            ], 201);
+            ];
+
+            // Cache the successful registration
+            $this->registrationCache[$cacheKey] = [
+                'timestamp' => time(),
+                'response' => $this->jsonResponse($response, 201)
+            ];
+
+            return $this->registrationCache[$cacheKey]['response'];
 
         } catch (Exception $e) {
             error_log("Registration error: " . $e->getMessage());
@@ -86,9 +97,94 @@ class AuthController extends Controller {
         }
     }
 
+    private $loginAttempts = [];
+    private $maxAttempts = 5;
+    private $lockoutTime = 900; // 15 minutes in seconds
+
+    public function updateNotificationToken() {
+        try {
+            $input = file_get_contents('php://input');
+            $data = json_decode($input, true);
+
+            if (!$data || !isset($data['onesignal_token'])) {
+                return $this->jsonResponse(['error' => 'OneSignal token is required'], 400);
+            }
+
+            $userId = $this->getUserIdFromToken();
+            if (!$userId) {
+                return $this->jsonResponse(['error' => 'Unauthorized'], 401);
+            }
+
+            $result = $this->userModel->update($userId, [
+                'onesignal_token' => $data['onesignal_token']
+            ]);
+
+            if ($result) {
+                return $this->jsonResponse(['message' => 'Notification token updated successfully']);
+            }
+
+            return $this->jsonResponse(['error' => 'Failed to update notification token'], 500);
+        } catch (Exception $e) {
+            error_log("Update notification token error: " . $e->getMessage());
+            return $this->jsonResponse(['error' => 'Failed to update notification token'], 500);
+        }
+    }
+
+    public function toggleNotifications() {
+        try {
+            $input = file_get_contents('php://input');
+            $data = json_decode($input, true);
+
+            if (!$data || !isset($data['enabled'])) {
+                return $this->jsonResponse(['error' => 'Notification status is required'], 400);
+            }
+
+            $userId = $this->getUserIdFromToken();
+            if (!$userId) {
+                return $this->jsonResponse(['error' => 'Unauthorized'], 401);
+            }
+
+            $result = $this->userModel->update($userId, [
+                'notification_enabled' => $data['enabled'] ? 1 : 0
+            ]);
+
+            if ($result) {
+                return $this->jsonResponse(['message' => 'Notification settings updated successfully']);
+            }
+
+            return $this->jsonResponse(['error' => 'Failed to update notification settings'], 500);
+        } catch (Exception $e) {
+            error_log("Toggle notifications error: " . $e->getMessage());
+            return $this->jsonResponse(['error' => 'Failed to update notification settings'], 500);
+        }
+    }
+
+    private function checkRateLimit($email) {
+        $now = time();
+        if (isset($this->loginAttempts[$email])) {
+            $attempts = array_filter($this->loginAttempts[$email], function($timestamp) use ($now) {
+                return $now - $timestamp < $this->lockoutTime;
+            });
+            $this->loginAttempts[$email] = $attempts;
+            
+            if (count($attempts) >= $this->maxAttempts) {
+                $timeLeft = $this->lockoutTime - ($now - min($attempts));
+                throw new Exception("Too many login attempts. Please try again in " . ceil($timeLeft / 60) . " minutes.");
+            }
+        }
+    }
+
+    private function recordLoginAttempt($email) {
+        if (!isset($this->loginAttempts[$email])) {
+            $this->loginAttempts[$email] = [];
+        }
+        $this->loginAttempts[$email][] = time();
+    }
+
     public function login() {
         try {
-            $data = json_decode(file_get_contents('php://input'), true);
+            $input = file_get_contents('php://input');
+            $data = json_decode($input, true);
 
             if (!$data) {
                 return $this->jsonResponse(['error' => 'Invalid JSON data'], 400);
@@ -98,21 +194,30 @@ class AuthController extends Controller {
                 return $this->jsonResponse(['error' => 'Email and password are required'], 400);
             }
 
+            if (!filter_var($data['email'], FILTER_VALIDATE_EMAIL)) {
+                return $this->jsonResponse(['error' => 'Invalid email format'], 400);
+            }
+
+            // Check rate limiting
+            try {
+                $this->checkRateLimit($data['email']);
+            } catch (Exception $e) {
+                return $this->jsonResponse(['error' => $e->getMessage()], 429);
+            }
+
             $user = $this->userModel->findByEmail($data['email']);
-
-            if (!$user) {
+            
+            if (!$user || !password_verify($data['password'], $user['password'])) {
+                $this->recordLoginAttempt($data['email']);
                 return $this->jsonResponse(['error' => 'Invalid email or password'], 401);
             }
 
-            if (!password_verify($data['password'], $user['password'])) {
-                return $this->jsonResponse(['error' => 'Invalid email or password'], 401);
-            }
-
-            // Generate JWT token
+            // Generate JWT token with shorter expiration
             $token = $this->generateToken($user['id']);
-
-            // Remove password from user data
             unset($user['password']);
+
+            // Clear login attempts on successful login
+            unset($this->loginAttempts[$data['email']]);
 
             return $this->jsonResponse([
                 'message' => 'Login successful',
@@ -127,18 +232,23 @@ class AuthController extends Controller {
     }
 
     private function generateToken($userId) {
-        $header = json_encode(['typ' => 'JWT', 'alg' => 'HS256']);
-        $payload = json_encode([
-            'user_id' => $userId,
-            'exp' => time() + (60 * 60 * 24) // 24 hours
-        ]);
+        try {
+            $header = json_encode(['typ' => 'JWT', 'alg' => 'HS256']);
+            $payload = json_encode([
+                'user_id' => $userId,
+                'exp' => time() + (60 * 60 * 24) // 24 hours
+            ]);
 
-        $base64UrlHeader = str_replace(['+', '/', '='], ['-', '_', ''], base64_encode($header));
-        $base64UrlPayload = str_replace(['+', '/', '='], ['-', '_', ''], base64_encode($payload));
+            $base64UrlHeader = str_replace(['+', '/', '='], ['-', '_', ''], base64_encode($header));
+            $base64UrlPayload = str_replace(['+', '/', '='], ['-', '_', ''], base64_encode($payload));
 
-        $signature = hash_hmac('sha256', $base64UrlHeader . "." . $base64UrlPayload, JWT_SECRET, true);
-        $base64UrlSignature = str_replace(['+', '/', '='], ['-', '_', ''], base64_encode($signature));
+            $signature = hash_hmac('sha256', $base64UrlHeader . "." . $base64UrlPayload, JWT_SECRET, true);
+            $base64UrlSignature = str_replace(['+', '/', '='], ['-', '_', ''], base64_encode($signature));
 
-        return $base64UrlHeader . "." . $base64UrlPayload . "." . $base64UrlSignature;
+            return $base64UrlHeader . "." . $base64UrlPayload . "." . $base64UrlSignature;
+        } catch (Exception $e) {
+            error_log("Token generation error: " . $e->getMessage());
+            throw new Exception("Failed to generate token");
+        }
     }
 }

@@ -1,299 +1,258 @@
 import React, { useState } from 'react';
-import { FaMapMarkerAlt, FaCalendarAlt, FaClock, FaUsers, FaArrowRight, FaShieldAlt, FaStar, FaHandshake, FaUserCircle } from 'react-icons/fa';
+import { useNavigate } from 'react-router-dom';
+import { FaMapMarkerAlt, FaCar, FaUsers, FaClock, FaShieldAlt, FaSearch, FaArrowRight } from 'react-icons/fa';
+import Map from '../components/Map';
+
+const DISTRICTS = [
+  { id: 'jhapa', name: 'Jhapa', description: 'Eastern Terai Region' },
+  { id: 'kalikot', name: 'Kalikot', description: 'Karnali Province' },
+  { id: 'kailali', name: 'Kailali', description: 'Sudurpashchim Province' }
+];
 
 const Home = () => {
+  const navigate = useNavigate();
+  const [selectedDistrict, setSelectedDistrict] = useState('all');
   const [pickupLocation, setPickupLocation] = useState('');
   const [dropoffLocation, setDropoffLocation] = useState('');
-  const [date, setDate] = useState('');
-  const [time, setTime] = useState('');
   const [passengers, setPassengers] = useState(1);
-  const [availableRiders, setAvailableRiders] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-  const [selectedRider, setSelectedRider] = useState(null);
+  const [showDistrictDropdown, setShowDistrictDropdown] = useState(false);
 
-  const findAvailableRiders = async () => {
-    if (!pickupLocation || !passengers) return;
-
-    setLoading(true);
-    setError(null);
-
-    try {
-      const response = await fetch('/api/rides/available-riders', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        },
-        body: JSON.stringify({
-          pickup_location: pickupLocation,
-          passengers: passengers
-        })
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch available riders');
-      }
-
-      const data = await response.json();
-      setAvailableRiders(data.available_riders);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
+  // Sample markers for available rides
+  const markers = [
+    {
+      position: [27.7172, 85.3240], // Kathmandu
+      title: 'Available Ride',
+      description: 'Kathmandu to Pokhara'
+    },
+    {
+      position: [27.4716, 89.6387], // Thimphu
+      title: 'Available Ride',
+      description: 'Thimphu to Paro'
+    },
+    {
+      position: [26.4521, 87.2718], // Biratnagar
+      title: 'Available Ride',
+      description: 'Biratnagar to Dharan'
     }
-  };
+  ];
 
-  const handleLocationChange = (e) => {
-    setPickupLocation(e.target.value);
-    if (pickupLocation && dropoffLocation) {
-      findAvailableRiders();
-    }
-  };
-
-  const handleSubmit = async (e) => {
+  const handleSearch = (e) => {
     e.preventDefault();
-    if (!selectedRider) {
-      setError('Please select a rider');
+    if (!selectedDistrict) {
+      alert('Please select a district');
       return;
     }
-
-    setLoading(true);
-    setError(null);
-
-    try {
-      const response = await fetch('/api/rides', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        },
-        body: JSON.stringify({
-          pickup_location: pickupLocation,
-          dropoff_location: dropoffLocation,
-          pickup_date: date,
-          pickup_time: time,
-          passengers: passengers,
-          rider_id: selectedRider.id
-        })
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to book ride');
+    navigate('/book-ride', {
+      state: {
+        pickupLocation,
+        dropoffLocation,
+        passengers,
+        district: selectedDistrict
       }
-
-      const data = await response.json();
-      // Handle successful booking
-      console.log('Booking successful:', data);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
+    });
   };
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-gray-50">
       {/* Hero Section */}
-      <div className="relative bg-gradient-to-r from-blue-600 to-blue-800 text-white py-20">
-        <div className="container mx-auto px-4">
-          <div className="max-w-4xl mx-auto text-center">
-            <h1 className="text-5xl font-bold mb-6">Your Journey Begins Here</h1>
-            <p className="text-xl mb-12">Book a ride with our professional drivers and experience safe, comfortable travel</p>
-            
-            {/* Booking Form */}
-            <form onSubmit={handleSubmit} className="bg-white rounded-xl shadow-2xl p-8 max-w-3xl mx-auto">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Pickup Location */}
+      <div className="relative bg-gradient-to-br from-red-600 via-red-700 to-red-800 text-white overflow-hidden">
+        <div className="absolute inset-0 bg-black opacity-40"></div>
+        <div className="absolute inset-0 bg-grid-pattern opacity-10"></div>
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-32">
+          <div className="text-center space-y-8">
+            <h1 className="text-5xl md:text-6xl font-bold leading-tight animate-fade-in">
+              Your Journey, Our Priority
+            </h1>
+            <p className="text-xl md:text-2xl max-w-3xl mx-auto text-gray-100 animate-fade-in-up">
+              Safe, comfortable, and reliable rides across Nepal
+            </p>
+            <div className="flex flex-col sm:flex-row gap-4 justify-center animate-fade-in-up">
+              <button
+                onClick={() => navigate('/register')}
+                className="bg-white text-red-600 px-8 py-4 rounded-full text-lg font-semibold hover:bg-gray-100 transition-all transform hover:scale-105 shadow-lg"
+              >
+                Get Started
+              </button>
+              <button
+                onClick={() => document.getElementById('booking-form').scrollIntoView({ behavior: 'smooth' })}
+                className="bg-transparent border-2 border-white text-white px-8 py-4 rounded-full text-lg font-semibold hover:bg-white hover:text-red-600 transition-all transform hover:scale-105"
+              >
+                Book a Ride
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Booking Form */}
+      <div id="booking-form" className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 -mt-16 relative z-10">
+        <div className="bg-white rounded-2xl shadow-2xl p-8 md:p-10 transform hover:scale-[1.02] transition-transform duration-300">
+          <h2 className="text-2xl font-bold text-gray-800 mb-6 text-center">Book Your Ride</h2>
+          <form onSubmit={handleSearch} className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Pickup Location
+                </label>
                 <div className="relative">
-                  <FaMapMarkerAlt className="absolute left-3 top-3 text-gray-400" />
+                  <FaMapMarkerAlt className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
                   <input
                     type="text"
-                    placeholder="Pickup Location"
                     value={pickupLocation}
-                    onChange={handleLocationChange}
-                    className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-800"
+                    onChange={(e) => setPickupLocation(e.target.value)}
+                    className="w-full pl-10 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                    placeholder="Enter pickup location"
                     required
                   />
-                </div>
-
-                {/* Dropoff Location */}
-                <div className="relative">
-                  <FaMapMarkerAlt className="absolute left-3 top-3 text-gray-400" />
-                  <input
-                    type="text"
-                    placeholder="Dropoff Location"
-                    value={dropoffLocation}
-                    onChange={(e) => setDropoffLocation(e.target.value)}
-                    className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-800"
-                    required
-                  />
-                </div>
-
-                {/* Date and Time */}
-                <div className="relative">
-                  <FaCalendarAlt className="absolute left-3 top-3 text-gray-400" />
-                  <input
-                    type="date"
-                    value={date}
-                    onChange={(e) => setDate(e.target.value)}
-                    className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-800"
-                    required
-                  />
-                </div>
-                <div className="relative">
-                  <FaClock className="absolute left-3 top-3 text-gray-400" />
-                  <input
-                    type="time"
-                    value={time}
-                    onChange={(e) => setTime(e.target.value)}
-                    className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-800"
-                    required
-                  />
-                </div>
-
-                {/* Passengers */}
-                <div className="relative md:col-span-2">
-                  <FaUsers className="absolute left-3 top-3 text-gray-400" />
-                  <select
-                    value={passengers}
-                    onChange={(e) => setPassengers(Number(e.target.value))}
-                    className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-800"
-                  >
-                    {[1, 2, 3, 4].map((num) => (
-                      <option key={num} value={num}>
-                        {num} {num === 1 ? 'Passenger' : 'Passengers'}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Available Riders */}
-                {availableRiders.length > 0 && (
-                  <div className="md:col-span-2">
-                    <h3 className="text-lg font-semibold mb-4 text-gray-800">Available Riders</h3>
-                    <div className="grid grid-cols-1 gap-4">
-                      {availableRiders.map((rider) => (
-                        <div
-                          key={rider.id}
-                          className={`p-4 border rounded-lg cursor-pointer transition-colors ${
-                            selectedRider?.id === rider.id
-                              ? 'border-blue-500 bg-blue-50'
-                              : 'border-gray-200 hover:border-blue-300'
-                          }`}
-                          onClick={() => setSelectedRider(rider)}
-                        >
-                          <div className="flex items-center space-x-4">
-                            <div className="w-12 h-12 rounded-full bg-gray-200 flex items-center justify-center">
-                              {rider.profile_image ? (
-                                <img
-                                  src={rider.profile_image}
-                                  alt={rider.rider_name}
-                                  className="w-full h-full rounded-full object-cover"
-                                />
-                              ) : (
-                                <FaUserCircle className="text-2xl text-gray-400" />
-                              )}
-                            </div>
-                            <div className="flex-1">
-                              <h4 className="font-semibold text-gray-800">{rider.rider_name}</h4>
-                              <div className="flex items-center space-x-2 text-sm text-gray-600">
-                                <span>{rider.vehicle_type}</span>
-                                <span>•</span>
-                                <span>{rider.experience_years} years experience</span>
-                                <span>•</span>
-                                <span className="flex items-center">
-                                  <FaStar className="text-yellow-400 mr-1" />
-                                  {rider.rating}
-                                </span>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Error Message */}
-                {error && (
-                  <div className="md:col-span-2 p-4 bg-red-50 text-red-600 rounded-lg">
-                    {error}
-                  </div>
-                )}
-
-                {/* Submit Button */}
-                <div className="md:col-span-2">
-                  <button
-                    type="submit"
-                    disabled={loading || !selectedRider}
-                    className={`w-full py-4 rounded-lg font-semibold flex items-center justify-center space-x-2 text-lg ${
-                      loading || !selectedRider
-                        ? 'bg-gray-400 cursor-not-allowed'
-                        : 'bg-blue-600 hover:bg-blue-700'
-                    } text-white transition-colors`}
-                  >
-                    <span>{loading ? 'Booking...' : 'Book Your Ride Now'}</span>
-                    <FaArrowRight />
-                  </button>
                 </div>
               </div>
-            </form>
-          </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Drop-off Location
+                </label>
+                <div className="relative">
+                  <FaMapMarkerAlt className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                  <input
+                    type="text"
+                    value={dropoffLocation}
+                    onChange={(e) => setDropoffLocation(e.target.value)}
+                    className="w-full pl-10 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                    placeholder="Enter drop-off location"
+                    required
+                  />
+                </div>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  District
+                </label>
+                <select
+                  value={selectedDistrict}
+                  onChange={(e) => setSelectedDistrict(e.target.value)}
+                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                >
+                  <option value="all">All Districts</option>
+                  {DISTRICTS.map((district) => (
+                    <option key={district.id} value={district.id}>
+                      {district.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Number of Passengers
+                </label>
+                <div className="relative">
+                  <FaUsers className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                  <input
+                    type="number"
+                    min="1"
+                    max="4"
+                    value={passengers}
+                    onChange={(e) => setPassengers(parseInt(e.target.value))}
+                    className="w-full pl-10 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                    required
+                  />
+                </div>
+              </div>
+            </div>
+            <button
+              type="submit"
+              className="w-full bg-red-600 text-white py-4 rounded-xl text-lg font-semibold hover:bg-red-700 transition-all transform hover:scale-[1.02] flex items-center justify-center shadow-lg"
+            >
+              <FaSearch className="mr-2" />
+              Search Available Rides
+              <FaArrowRight className="ml-2" />
+            </button>
+          </form>
+        </div>
+      </div>
+
+      {/* Map Section */}
+      <div className="max-w-7xl mx-auto px-4 py-12">
+        <h2 className="text-3xl font-bold text-gray-900 mb-8 text-center">
+          Available Rides
+        </h2>
+        <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
+          <Map
+            height="500px"
+            markers={markers}
+            center={[27.7172, 85.3240]} // Kathmandu coordinates
+            zoom={7}
+          />
         </div>
       </div>
 
       {/* Features Section */}
-      <div className="py-20 bg-white">
-        <div className="container mx-auto px-4">
-          <h2 className="text-4xl font-bold text-center mb-16 text-gray-800">Why Choose Us</h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-12">
-            <div className="text-center p-8 bg-white rounded-xl shadow-lg hover:shadow-xl transition-shadow">
-              <div className="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                <FaShieldAlt className="text-3xl text-blue-600" />
-              </div>
-              <h3 className="text-2xl font-semibold mb-4 text-gray-800">Safe & Secure</h3>
-              <p className="text-gray-600 text-lg">Your safety is our top priority. All our drivers are verified and trained professionals.</p>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24">
+        <h2 className="text-3xl font-bold text-center mb-16">Why Choose Us</h2>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          <div className="bg-white p-8 rounded-2xl shadow-lg hover:shadow-xl transition-all transform hover:-translate-y-1">
+            <div className="bg-red-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-6">
+              <FaCar className="text-2xl text-red-600" />
             </div>
-            <div className="text-center p-8 bg-white rounded-xl shadow-lg hover:shadow-xl transition-shadow">
-              <div className="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                <FaStar className="text-3xl text-blue-600" />
-              </div>
-              <h3 className="text-2xl font-semibold mb-4 text-gray-800">Premium Service</h3>
-              <p className="text-gray-600 text-lg">Experience luxury and comfort with our premium fleet of vehicles.</p>
+            <h3 className="text-xl font-semibold mb-3 text-center">Modern Fleet</h3>
+            <p className="text-gray-600 text-center">
+              Comfortable and well-maintained vehicles for your journey
+            </p>
+          </div>
+          <div className="bg-white p-8 rounded-2xl shadow-lg hover:shadow-xl transition-all transform hover:-translate-y-1">
+            <div className="bg-red-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-6">
+              <FaClock className="text-2xl text-red-600" />
             </div>
-            <div className="text-center p-8 bg-white rounded-xl shadow-lg hover:shadow-xl transition-shadow">
-              <div className="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                <FaHandshake className="text-3xl text-blue-600" />
-              </div>
-              <h3 className="text-2xl font-semibold mb-4 text-gray-800">Reliable & Punctual</h3>
-              <p className="text-gray-600 text-lg">Count on us for timely pickups and professional service every time.</p>
+            <h3 className="text-xl font-semibold mb-3 text-center">24/7 Service</h3>
+            <p className="text-gray-600 text-center">
+              Available round the clock for your convenience
+            </p>
+          </div>
+          <div className="bg-white p-8 rounded-2xl shadow-lg hover:shadow-xl transition-all transform hover:-translate-y-1">
+            <div className="bg-red-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-6">
+              <FaShieldAlt className="text-2xl text-red-600" />
             </div>
+            <h3 className="text-xl font-semibold mb-3 text-center">Safe Travel</h3>
+            <p className="text-gray-600 text-center">
+              Verified drivers and real-time tracking for your safety
+            </p>
           </div>
         </div>
       </div>
 
-      {/* Stats Section */}
-      <div className="bg-gray-50 py-20">
-        <div className="container mx-auto px-4">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-8 text-center">
-            <div>
-              <div className="text-4xl font-bold text-blue-600 mb-2">10K+</div>
-              <div className="text-gray-600">Happy Customers</div>
-            </div>
-            <div>
-              <div className="text-4xl font-bold text-blue-600 mb-2">500+</div>
-              <div className="text-gray-600">Professional Drivers</div>
-            </div>
-            <div>
-              <div className="text-4xl font-bold text-blue-600 mb-2">50+</div>
-              <div className="text-gray-600">Cities Covered</div>
-            </div>
-            <div>
-              <div className="text-4xl font-bold text-blue-600 mb-2">4.8/5</div>
-              <div className="text-gray-600">Customer Rating</div>
-            </div>
+      {/* Districts Section */}
+      <div className="bg-gray-50 py-24">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <h2 className="text-3xl font-bold text-center mb-16">Available Districts</h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            {DISTRICTS.map((district) => (
+              <div
+                key={district.id}
+                className="bg-white p-8 rounded-2xl shadow-lg hover:shadow-xl transition-all transform hover:-translate-y-1 cursor-pointer"
+                onClick={() => setSelectedDistrict(district.id)}
+              >
+                <div className="bg-red-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-6">
+                  <FaMapMarkerAlt className="text-2xl text-red-600" />
+                </div>
+                <h3 className="text-xl font-semibold mb-3 text-center">{district.name}</h3>
+                <p className="text-gray-600 text-center">{district.description}</p>
+              </div>
+            ))}
           </div>
+        </div>
+      </div>
+
+      {/* CTA Section */}
+      <div className="bg-gradient-to-br from-gray-900 to-gray-800 text-white py-24">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+          <h2 className="text-3xl font-bold mb-6">Ready to Start Your Journey?</h2>
+          <p className="text-xl mb-8 text-gray-300">Join thousands of satisfied customers</p>
+          <button
+            onClick={() => navigate('/register')}
+            className="bg-red-600 text-white px-8 py-4 rounded-full text-lg font-semibold hover:bg-red-700 transition-all transform hover:scale-105 shadow-lg"
+          >
+            Sign Up Now
+          </button>
         </div>
       </div>
     </div>
