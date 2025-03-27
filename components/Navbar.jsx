@@ -1,8 +1,8 @@
 import React, { useState } from "react";
 import { Link } from "react-router-dom";
-import { FaBars, FaTimes } from "react-icons/fa";
+import { FaBars, FaTimes, FaUserCircle, FaSignInAlt } from "react-icons/fa";
 
-const Navbar = () => {
+const Navbar = ({ isAuthenticated }) => {
   const [menuOpen, setMenuOpen] = useState(false);
 
   return (
@@ -16,33 +16,44 @@ const Navbar = () => {
         </div>
 
         {/* Desktop Menu */}
-        <ul className="hidden md:flex space-x-8">
-          <li>
-            <Link to="/" className="text-black hover:text-gray-600 font-semibold text-lg">
-              Home
+        <div className="hidden md:flex items-center">
+          <ul className="flex space-x-8 mr-8">
+            <li>
+              <Link to="/" className="text-black hover:text-gray-600 font-semibold text-lg">
+                Home
+              </Link>
+            </li>
+            <li>
+              <Link to="/rides" className="text-black hover:text-gray-600 font-semibold text-lg">
+                Rides
+              </Link>
+            </li>
+            <li>
+              <Link to="/about" className="text-black hover:text-gray-600 font-semibold text-lg">
+                About
+              </Link>
+            </li>
+            <li>
+              <Link to="/contact" className="text-black hover:text-gray-600 font-semibold text-lg">
+                Contact
+              </Link>
+            </li>
+            <li>
+              <Link to="/riders" className="text-black hover:text-gray-600 font-semibold text-lg">
+                Riders
+              </Link>
+            </li>
+          </ul>
+          {isAuthenticated ? (
+            <Link to="/profile" className="text-2xl text-black hover:text-gray-600" title="Profile">
+              <FaUserCircle />
             </Link>
-          </li>
-          <li>
-            <Link to="/rides" className="text-black hover:text-gray-600 font-semibold text-lg">
-              Rides
+          ) : (
+            <Link to="/login" className="text-2xl text-black hover:text-gray-600" title="Sign In">
+              <FaSignInAlt />
             </Link>
-          </li>
-          <li>
-            <Link to="/about" className="text-black hover:text-gray-600 font-semibold text-lg">
-              About
-            </Link>
-          </li>
-          <li>
-            <Link to="/contact" className="text-black hover:text-gray-600 font-semibold text-lg">
-              Contact
-            </Link>
-          </li>
-          <li>
-            <Link to="/riders" className="text-black hover:text-gray-600 font-semibold text-lg">
-              Riders
-            </Link>
-          </li>
-        </ul>
+          )}
+        </div>
 
         {/* Hamburger Button (Mobile) */}
         <button
@@ -99,6 +110,15 @@ const Navbar = () => {
               onClick={() => setMenuOpen(false)}
             >
               Riders
+            </Link>
+          </li>
+          <li>
+            <Link
+              to={isAuthenticated ? "/profile" : "/login"}
+              className="text-black hover:text-gray-600 font-semibold text-lg"
+              onClick={() => setMenuOpen(false)}
+            >
+              {isAuthenticated ? "Profile" : "Sign In"}
             </Link>
           </li>
         </ul>
